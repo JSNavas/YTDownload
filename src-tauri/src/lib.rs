@@ -172,6 +172,71 @@ async fn check_update() -> Option<String> {
     }
 }
 
+/// ¿Hay una versión más nueva de YTDownload publicada?
+/// Compara la versión compilada con la última release de GitHub. Devuelve
+/// None ante cualquier fallo: no avisamos de algo que no podemos confirmar.
+#[tauri::command]
+async fn check_app_update() -> Option<serde_json::Value> {
+    let current = env!("CARGO_PKG_VERSION");
+    let out = Command::new("/usr/bin/curl")
+        .args([
+            "-fsSL",
+            "--max-time",
+            "8",
+            "-H",
+            "Accept: application/vnd.github+json",
+            "https://api.github.com/repos/JSNavas/YTDownload/releases/latest",
+        ])
+        .output()
+        .await
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
+    let latest = v
+        .get("tag_name")?
+        .as_str()?
+        .trim_start_matches('v')
+        .to_string();
+    let url = v.get("html_url")?.as_str()?.to_string();
+
+    if version_is_newer(&latest, current) {
+        Some(serde_json::json!({ "version": latest, "url": url }))
+    } else {
+        None
+    }
+}
+
+/// Compara versiones tipo 0.1.10 por número, no como texto:
+/// "0.1.10" es mayor que "0.1.9" aunque alfabéticamente sea al revés.
+fn version_is_newer(candidate: &str, current: &str) -> bool {
+    let parse = |s: &str| -> Vec<u32> {
+        s.split(['.', '-'])
+            .map(|p| p.parse::<u32>().unwrap_or(0))
+            .collect()
+    };
+    let (a, b) = (parse(candidate), parse(current));
+    for i in 0..a.len().max(b.len()) {
+        let x = a.get(i).copied().unwrap_or(0);
+        let y = b.get(i).copied().unwrap_or(0);
+        if x != y {
+            return x > y;
+        }
+    }
+    false
+}
+
+/// Abre una URL en el navegador del usuario.
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    // Solo http/https: no queremos abrir rutas ni esquemas arbitrarios.
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("URL no permitida".into());
+    }
+    opener_open(&url, false)
+}
+
 /// Actualiza yt-dlp (la causa #1 de "no me descarga" cuando YouTube cambia algo).
 /// Devuelve siempre un mensaje legible: actualizado, ya al día, o qué falló.
 #[tauri::command]
@@ -612,9 +677,12 @@ fn load_history() -> Vec<serde_json::Value> {
 #[tauri::command]
 fn save_history(items: Vec<serde_json::Value>) -> Result<(), String> {
     let p = history_path()?;
-    // Un tope para que no crezca sin fin tras muchas playlists.
-    let trimmed: Vec<_> = if items.len() > 500 {
-        items[items.len() - 500..].to_vec()
+    // Tope alto a propósito: con 500 se perdían descargas reales en cuanto
+    // alguien bajaba un par de playlists grandes, y se perdían en silencio.
+    // 10.000 entradas son unos 6 MB de JSON, que no es problema para nadie.
+    const MAX: usize = 10_000;
+    let trimmed: Vec<_> = if items.len() > MAX {
+        items[items.len() - MAX..].to_vec()
     } else {
         items
     };
@@ -862,6 +930,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             check_tools,
             check_update,
+            check_app_update,
+            open_url,
             update_ytdlp,
             probe_url,
             download_item,

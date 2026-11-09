@@ -175,6 +175,7 @@ La app hace exactamente dos peticiones, las dos opcionales y ninguna lleva nada 
 | Petición | Para qué |
 |---|---|
 | `api.github.com/repos/yt-dlp/yt-dlp/releases/latest` | Ver si hay un yt-dlp más nuevo |
+| `api.github.com/repos/JSNavas/YTDownload/releases/latest` | Ver si hay una versión nueva de YTDownload |
 | `i.ytimg.com` | Mostrar la miniatura en la ventana |
 
 Todo lo demás es `yt-dlp` hablando con YouTube, como es de esperar.

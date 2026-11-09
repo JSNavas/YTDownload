@@ -172,6 +172,7 @@ anything about you:
 | Request | Why |
 |---|---|
 | `api.github.com/repos/yt-dlp/yt-dlp/releases/latest` | Check whether a newer yt-dlp exists |
+| `api.github.com/repos/JSNavas/YTDownload/releases/latest` | Check whether a newer version of YTDownload exists |
 | `i.ytimg.com` | Show the thumbnail in the window |
 
 Everything else is `yt-dlp` talking to YouTube, as you'd expect.

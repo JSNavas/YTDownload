@@ -116,6 +116,7 @@
 
         <div class="actions">
           <button id="go" class="btn primary big" data-i18n="addToQueue"></button>
+          <button id="go-later" class="btn big" data-i18n="addLater"></button>
         </div>
       </section>
 
@@ -128,6 +129,8 @@
             <span data-i18n="tabQueued"></span><b id="c-queued">0</b></button>
           <button class="tab" data-filter="downloading">
             <span data-i18n="tabDownloading"></span><b id="c-downloading">0</b></button>
+          <button class="tab" data-filter="later">
+            <span data-i18n="tabLater"></span><b id="c-later">0</b></button>
           <button class="tab" data-filter="done">
             <span data-i18n="tabCompleted"></span><b id="c-done">0</b></button>
           <button class="tab" data-filter="failed">
@@ -142,8 +145,10 @@
           </label>
           <span class="sep" id="tb-sep"></span>
           <button id="start" class="btn primary sm" data-i18n="startAll"></button>
+          <button id="start-later" class="btn primary sm" data-i18n="downloadNow"></button>
           <button id="retry-failed" class="btn sm" data-i18n="retryFailed"></button>
           <button id="clear-done" class="btn sm" data-i18n="clearCompleted"></button>
+          <button id="clear-failed" class="btn sm ghost-danger" data-i18n="clearFailed"></button>
           <button id="remove-sel" class="btn sm ghost-danger" data-i18n="removeSelected"></button>
           <button id="cancel-all" class="btn sm danger hidden" data-i18n="cancelAll"></button>
         </div>

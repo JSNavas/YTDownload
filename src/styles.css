@@ -29,6 +29,26 @@
 }
 
 * { box-sizing: border-box; }
+
+/* El scroll por defecto de macOS es gris claro y canta mucho sobre el
+   fondo oscuro. Lo bajamos al tono de los bordes. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a4c;
+  background-clip: padding-box;
+}
 html, body { height: 100%; }
 body {
   margin: 0;

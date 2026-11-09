@@ -23,7 +23,12 @@ const I18N = {
     addToQueue: "Añadir a la cola", videoOne: "Video",
     playlistN: (n) => `Playlist · ${n} videos`,
     tabAll: "Todas", tabQueued: "En cola", tabDownloading: "Descargando",
-    tabCompleted: "Completadas", tabFailed: "Fallidas",
+    tabCompleted: "Completadas", tabFailed: "Fallidas", tabLater: "Pendientes",
+    addLater: "Descargar más tarde", downloadNow: "Descargar ahora",
+    clearFailed: "Quitar fallidas", stLater: "Pendiente",
+    tLater: "Guardado para más tarde",
+    tLaterN: (n) => `${n} videos guardados para más tarde`,
+    aDownloadNow: "Descargar ahora",
     selectAll: "Seleccionar todas", startAll: "Descargar",
     retryFailed: "Reintentar fallidas", clearCompleted: "Quitar completadas",
     removeSelected: "Quitar seleccionadas", cancelAll: "Cancelar todo",
@@ -52,6 +57,8 @@ const I18N = {
     aRetry: "Reintentar", aFolder: "Ver en carpeta", aRemove: "Quitar de la lista",
     aCancel: "Cancelar", missing: (w) => `Falta ${w} · instálalo con: brew install ${w}`,
     updAvail: (v) => `Nueva versión de yt-dlp (${v})`, update: "Actualizar",
+    appUpdAvail: (v) => `YTDownload ${v} disponible`,
+    appUpdGet: "Descargar",
     updating: "Actualizando…",
   },
   en: {
@@ -69,7 +76,12 @@ const I18N = {
     addToQueue: "Add to queue", videoOne: "Video",
     playlistN: (n) => `Playlist · ${n} videos`,
     tabAll: "All", tabQueued: "Queued", tabDownloading: "Downloading",
-    tabCompleted: "Completed", tabFailed: "Failed",
+    tabCompleted: "Completed", tabFailed: "Failed", tabLater: "Pending",
+    addLater: "Download later", downloadNow: "Download now",
+    clearFailed: "Clear failed", stLater: "Pending",
+    tLater: "Saved for later",
+    tLaterN: (n) => `${n} videos saved for later`,
+    aDownloadNow: "Download now",
     selectAll: "Select all", startAll: "Download",
     retryFailed: "Retry failed", clearCompleted: "Clear completed",
     removeSelected: "Remove selected", cancelAll: "Cancel all",
@@ -98,6 +110,8 @@ const I18N = {
     aRetry: "Retry", aFolder: "Show in folder", aRemove: "Remove from list",
     aCancel: "Cancel", missing: (w) => `${w} is missing · install it: brew install ${w}`,
     updAvail: (v) => `New yt-dlp version (${v})`, update: "Update",
+    appUpdAvail: (v) => `YTDownload ${v} available`,
+    appUpdGet: "Get it",
     updating: "Updating…",
   },
 };
@@ -246,7 +260,19 @@ async function refreshTools() {
     return;
   }
 
-  // Todo correcto: no decimos nada. Solo hablamos si hay novedad.
+  // Primero lo más importante: si hay una versión nueva de la propia app.
+  invoke("check_app_update").then((info) => {
+    if (!info) return;
+    const span = el("span");
+    span.textContent = t("appUpdAvail", info.version);
+    const b = el("button", "btn sm primary");
+    b.textContent = t("appUpdGet");
+    b.onclick = () => invoke("open_url", { url: info.url }).catch(() => {});
+    box.prepend(b);
+    box.prepend(span);
+  }).catch(() => {});
+
+  // Y después, si hace falta actualizar yt-dlp.
   invoke("check_update").then((v) => {
     if (!v) return;
     const span = el("span");
@@ -348,9 +374,10 @@ function thumbOf(url) {
   return id ? `https://i.ytimg.com/vi/${id}/mqdefault.jpg` : "";
 }
 
-async function addToQueue() {
+async function addToQueue(initialStatus = "queued") {
   const p = S.probe;
   if (!p) return;
+  const later = initialStatus === "later";
   const isPl = scope() === "playlist";
   const useSub = isPl && $("use-folder").checked;
   const dest = await invoke("resolve_target", {
@@ -393,7 +420,7 @@ async function addToQueue() {
       url: s.url, title: s.title, index: s.index, duration: s.duration,
       uploader: p.uploader || "", thumb: thumbOf(s.url),
       fmt: f, quality: q, dest,
-      status: "queued", percent: 0, speed: "", eta: "",
+      status: initialStatus, percent: 0, speed: "", eta: "",
       error: "", filepath: "", selected: false, batchSeq: 0,
     });
   }
@@ -403,12 +430,16 @@ async function addToQueue() {
     return;
   }
 
-  if (fresh.length > 1) toast("info", t("tAddedN", fresh.length), p.title);
+  if (fresh.length > 1) {
+    toast("info", later ? t("tLaterN", fresh.length) : t("tAddedN", fresh.length), p.title);
+  } else if (later) {
+    toast("info", t("tLater"), p.title);
+  }
   if (skipped > 0) toast("info", t("dupSkipped", skipped));
   render();
   persist();
-  pump();
-  // Ya está en la cola: el panel de arriba ha cumplido su función y deja
+  if (!later) pump();
+  // Ya está en la lista: el panel de arriba ha cumplido su función y deja
   // el campo listo para la siguiente URL.
   clearProbe();
 }
@@ -426,8 +457,9 @@ function rankOf(i) {
   const fresh = i.batchSeq > 0;
   if (fresh && (i.status === "done" || i.status === "failed")) return 1;
   if (i.status === "queued") return 2;
-  if (i.status === "failed" || i.status === "cancelled") return 3;
-  return 4;
+  if (i.status === "later") return 3;
+  if (i.status === "failed" || i.status === "cancelled") return 4;
+  return 5;
 }
 
 // Observa el final de la lista: cuando asoma, pinta otras PAGE filas.
@@ -496,6 +528,7 @@ function updateCounts() {
   $("c-all").textContent = S.queue.length;
   $("c-queued").textContent = byStatus("queued").length;
   $("c-downloading").textContent = byStatus("downloading").length;
+  $("c-later").textContent = byStatus("later").length;
   $("c-done").textContent = byStatus("done").length;
   $("c-failed").textContent = byStatus("failed").length;
 
@@ -517,10 +550,20 @@ function updateCounts() {
   const retryable = failed + byStatus("cancelled").length;
   const anySelected = S.queue.some((i) => i.selected);
   const show = (id, cond) => $(id).classList.toggle("hidden", !cond);
+  const later = byStatus("later").length;
+  const selLater = S.queue.filter((i) => i.selected && i.status === "later").length;
+  const onFailedTab = S.filter === "failed";
+  const onLaterTab = S.filter === "later";
 
-  show("start", queued > 0 && S.running.size === 0);
-  show("retry-failed", retryable > 0);
-  show("clear-done", done > 0);
+  // En la pestaña de pendientes solo manda "Descargar ahora": el otro
+  // botón es para la cola y poner los dos juntos solo confunde.
+  show("start", queued > 0 && S.running.size === 0 && !onLaterTab);
+  // En Pendientes el botón manda sobre lo seleccionado, o sobre todas.
+  show("start-later", later > 0 && (onLaterTab || selLater > 0));
+  show("retry-failed", retryable > 0 && !onLaterTab);
+  // "Quitar completadas" no pinta nada en la pestaña de fallidas.
+  show("clear-done", done > 0 && !onFailedTab && !onLaterTab);
+  show("clear-failed", failed > 0 && onFailedTab);
   show("remove-sel", anySelected);
   show("cancel-all", S.running.size > 0);
 
@@ -536,6 +579,7 @@ const ACT = {
   retry:  '<path d="M3 12a9 9 0 1 0 2.6-6.4"/><path d="M3 4v5h5"/>',
   remove: '<path d="M18 6 6 18M6 6l12 12"/>',
   cancel: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+  now:    '<path d="M12 4v12"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/>',
 };
 function actionBtn(kind, title, extra = "") {
   const b = el("button", `icon-btn ${extra}`);
@@ -548,6 +592,7 @@ function actionBtn(kind, title, extra = "") {
 function stateText(item) {
   switch (item.status) {
     case "queued": return t("stQueued");
+    case "later": return t("stLater");
     case "downloading":
       if (item.phase === "post") return t("stConverting");
       return `${item.percent.toFixed(0)}%` +
@@ -610,6 +655,11 @@ function render() {
     if (item.status === "downloading") {
       const b = actionBtn("cancel", t("aCancel"), "danger-i");
       b.onclick = () => cancelItem(item);
+      acts.appendChild(b);
+    }
+    if (item.status === "later") {
+      const b = actionBtn("now", t("aDownloadNow"), "ok-i");
+      b.onclick = () => { item.status = "queued"; render(); persist(); pump(); };
       acts.appendChild(b);
     }
     if (item.status === "failed" || item.status === "cancelled") {
@@ -782,7 +832,8 @@ function clearProbe() {
 $("clear-probe").onclick = clearProbe;
 $("probe").onclick = doProbe;
 $("url").onkeydown = (e) => { if (e.key === "Enter") doProbe(); };
-$("go").onclick = addToQueue;
+$("go").onclick = () => addToQueue("queued");
+$("go-later").onclick = () => addToQueue("later");
 
 $("pick").onclick = async () => {
   if (!openDialog) { $("dest").focus(); return; }
@@ -817,6 +868,17 @@ $("sel-all").onchange = (e) => {
   render();
 };
 $("start").onclick = pump;
+$("start-later").onclick = () => {
+  // Si hay selección, solo esas; si no, todas las pendientes.
+  const sel = S.queue.filter((i) => i.selected && i.status === "later");
+  const target = sel.length ? sel : byStatus("later");
+  for (const i of target) { i.status = "queued"; i.selected = false; }
+  render(); persist(); pump();
+};
+$("clear-failed").onclick = () => {
+  S.queue = S.queue.filter((i) => i.status !== "failed" && i.status !== "cancelled");
+  render(); persist();
+};
 $("retry-failed").onclick = () => {
   for (const i of S.queue) if (i.status === "failed" || i.status === "cancelled") {
     i.status = "queued"; i.error = "";
