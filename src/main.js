@@ -32,7 +32,9 @@ const I18N = {
     settings: "Ajustes", language: "Idioma",
     simultaneous: "Descargas simultáneas",
     simultaneousHint: "Más no siempre es más rápido: YouTube limita las conexiones.",
-    defaultFolder: "Carpeta por defecto",
+    defaultFolderAudio: "Carpeta para la música",
+    defaultFolderVideo: "Carpeta para los vídeos",
+    defaultFolderHint: "Cada formato va a la suya, así la música y los vídeos no se mezclan.",
     history: "Historial",
     historyHint: "La cola se guarda en disco: al reabrir la app sigue estando.",
     clearHistory: "Borrar el historial",
@@ -76,7 +78,9 @@ const I18N = {
     settings: "Settings", language: "Language",
     simultaneous: "Simultaneous downloads",
     simultaneousHint: "More isn't always faster: YouTube throttles connections.",
-    defaultFolder: "Default folder",
+    defaultFolderAudio: "Folder for music",
+    defaultFolderVideo: "Folder for videos",
+    defaultFolderHint: "Each format has its own, so music and video don't end up mixed together.",
     history: "History",
     historyHint: "The queue is saved to disk, so it's still here next time you open the app.",
     clearHistory: "Clear the history",
@@ -107,7 +111,9 @@ const t = (k, ...a) => {
 const S = {
   lang: "es",
   concurrency: 3,
-  defaultDest: "",
+  // Una carpeta por formato: mezclarlas es justo lo que no queremos.
+  destMp3: "",
+  destVideo: "",
   filter: "all",
   queue: [],
   running: new Set(),
@@ -142,7 +148,8 @@ function loadSettings() {
 function saveSettings() {
   try {
     localStorage.setItem("ytdownload.settings", JSON.stringify({
-      lang: S.lang, concurrency: S.concurrency, defaultDest: S.defaultDest,
+      lang: S.lang, concurrency: S.concurrency,
+      destMp3: S.destMp3, destVideo: S.destVideo,
     }));
   } catch (_) { /* no es crítico */ }
 }
@@ -270,9 +277,11 @@ function fillQuality() {
   $("q-label").textContent = f === "mp3" ? t("qAudio") : t("qVideo");
 }
 
+const destKey = () => (fmt() === "mp3" ? "destMp3" : "destVideo");
+
 async function refreshDest() {
   if (!S.destTouched) {
-    $("dest").value = S.defaultDest || await invoke("default_dest", { format: fmt() });
+    $("dest").value = S[destKey()] || await invoke("default_dest", { format: fmt() });
   }
   await refreshTarget();
 }
@@ -456,6 +465,16 @@ function persist() {
   }, 500);
 }
 
+// La carpeta por defecto no se queda vacía esperando a que el usuario la
+// elija: se rellena con la del sistema en el primer arranque.
+async function ensureDefaultDest() {
+  try {
+    if (!S.destMp3) S.destMp3 = await invoke("default_dest", { format: "mp3" });
+    if (!S.destVideo) S.destVideo = await invoke("default_dest", { format: "video" });
+    saveSettings();
+  } catch (_) { /* refreshDest lo resolverá igualmente */ }
+}
+
 async function loadHistory() {
   let items;
   try { items = await invoke("load_history"); } catch (_) { return; }
@@ -580,9 +599,9 @@ function render() {
     main.append(ttl, sub);
 
     if (item.status === "downloading") {
-      const bar = el("div", "bar qi-bar");
+      const bar = el("div", "bar qi-bar" + (item.phase === "post" ? " indet" : ""));
       const fill = el("div");
-      fill.style.width = `${item.percent}%`;
+      if (item.phase !== "post") fill.style.width = `${item.percent}%`;
       bar.appendChild(fill);
       main.appendChild(bar);
     }
@@ -658,8 +677,13 @@ function patchRow(item) {
   if (!li) return;
   const st = li.querySelector(".qi-state");
   if (st) st.textContent = stateText(item);
-  const fill = li.querySelector(".qi-bar > div");
-  if (fill) fill.style.width = `${item.percent}%`;
+  const bar = li.querySelector(".qi-bar");
+  if (bar) {
+    const post = item.phase === "post";
+    bar.classList.toggle("indet", post);
+    const fill = bar.firstElementChild;
+    if (fill && !post) fill.style.width = `${item.percent}%`;
+  }
 }
 
 function pump() {
@@ -730,7 +754,8 @@ function cancelItem(item) {
 function openSettings() {
   $("conc").value = S.concurrency;
   $("conc-out").value = S.concurrency;
-  $("def-dest").value = S.defaultDest;
+  $("def-dest-mp3").value = S.destMp3;
+  $("def-dest-video").value = S.destVideo;
   $("settings").classList.remove("hidden");
 }
 function closeSettings() { $("settings").classList.add("hidden"); }
@@ -774,7 +799,7 @@ $("use-folder").onchange = () => {
   refreshTarget();
 };
 for (const r of document.querySelectorAll('input[name="fmt"]')) {
-  r.onchange = () => { fillQuality(); refreshDest(); };
+  r.onchange = () => { S.destTouched = false; fillQuality(); refreshDest(); };
 }
 
 for (const tab of document.querySelectorAll(".tab")) {
@@ -838,12 +863,14 @@ $("conc").oninput = (e) => {
   saveSettings();
   pump();
 };
-$("def-dest").oninput = (e) => { S.defaultDest = e.target.value.trim(); saveSettings(); };
-$("pick-def").onclick = async () => {
-  if (!openDialog) { $("def-dest").focus(); return; }
-  const dir = await openDialog({ directory: true, multiple: false });
-  if (dir) { S.defaultDest = dir; $("def-dest").value = dir; saveSettings(); refreshDest(); }
-};
+for (const [field, key] of [["def-dest-mp3", "destMp3"], ["def-dest-video", "destVideo"]]) {
+  $(field).oninput = (e) => { S[key] = e.target.value.trim(); saveSettings(); refreshDest(); };
+  $("pick-" + field.replace("def-dest-", "def-")).onclick = async () => {
+    if (!openDialog) { $(field).focus(); return; }
+    const dir = await openDialog({ directory: true, multiple: false, defaultPath: S[key] });
+    if (dir) { S[key] = dir; $(field).value = dir; saveSettings(); refreshDest(); }
+  };
+}
 for (const r of document.querySelectorAll('input[name="lang"]')) {
   r.onchange = () => { S.lang = r.value; saveSettings(); applyI18n(); };
 }
@@ -854,5 +881,5 @@ loadSettings();
 fillQuality();
 applyI18n();
 refreshTools();
-refreshDest();
+ensureDefaultDest().then(refreshDest);
 loadHistory();

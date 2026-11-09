@@ -458,15 +458,18 @@ fn resolve_target(dest: String, folder: Option<String>, is_playlist: bool) -> St
     p.display().to_string()
 }
 
+/// Carpeta sugerida la primera vez: Descargas/YTDownload, con una subcarpeta
+/// por tipo para que la música y los vídeos no acaben mezclados. Se resuelve
+/// con la carpeta real del sistema, así que vale en cualquier idioma y
+/// cualquier sistema operativo. Los nombres en disco van en inglés a
+/// propósito: no cambian si el usuario cambia el idioma de la app.
 #[tauri::command]
 fn default_dest(format: String) -> String {
-    let base = if format == "mp3" {
-        dirs::audio_dir().or_else(dirs::home_dir)
-    } else {
-        dirs::video_dir().or_else(dirs::home_dir)
-    };
-    let mut p = base.unwrap_or_else(|| PathBuf::from("."));
+    let mut p = dirs::download_dir()
+        .or_else(dirs::home_dir)
+        .unwrap_or_else(|| PathBuf::from("."));
     p.push("YTDownload");
+    p.push(if format == "mp3" { "Music" } else { "Video" });
     p.display().to_string()
 }
 
