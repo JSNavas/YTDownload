@@ -6,6 +6,10 @@ src-tauri/gen/
 node_modules/
 npm-debug.log*
 
+# El lockfile SÍ va al repo: `npm ci` y la caché de la CI lo necesitan.
+# Esta negación lo rescata de un ~/.gitignore_global que lo excluya.
+!package-lock.json
+
 # macOS
 .DS_Store
 
