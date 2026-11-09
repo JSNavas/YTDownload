@@ -588,7 +588,7 @@ fn cancel_item(id: String, state: State<'_, Running>) -> Result<(), String> {
 #[tauri::command]
 fn cancel_all(state: State<'_, Running>) -> Result<(), String> {
     let mut map = state.0.lock().map_err(|e| e.to_string())?;
-    for (_, child) in map.iter_mut() {
+    for child in map.values_mut() {
         let _ = child.start_kill();
     }
     map.clear();
