@@ -1,0 +1,16 @@
+{
+  "name": "ytdownload",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  },
+  "description": "YouTube downloader: playlists and videos, MP3 or MP4. No ads, no limits, no telemetry.",
+  "license": "MIT"
+}

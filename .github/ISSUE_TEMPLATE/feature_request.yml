@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest something YTDownload should do.
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem?
+      description: Describe the situation you're in, not just the solution you have in mind.
+      placeholder: "When I download a long playlist I can't tell which files failed..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like it to do?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Please confirm
+      description: YTDownload keeps a deliberately small surface. See CONTRIBUTING.md.
+      options:
+        - label: This doesn't add files or data the user didn't explicitly ask for
+          required: true
+        - label: This doesn't send anything about the user anywhere
+          required: true

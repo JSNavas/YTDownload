@@ -1,0 +1,59 @@
+name: Bug report
+description: Something doesn't work. Report it here.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. English or Spanish are both fine.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: And what did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Paste this URL (a public one, if you can share it)
+        2. Pick MP3 / 192 kbps
+        3. Press Download
+        4. ...
+    validations:
+      required: true
+
+  - type: input
+    id: url-type
+    attributes:
+      label: Single video or playlist?
+      placeholder: "Playlist, 35 videos"
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [macOS, Windows, Linux]
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: "Run `yt-dlp --version` and `ffmpeg -version | head -1`, and tell us the YTDownload release."
+      placeholder: "YTDownload 0.1.0 · yt-dlp 2026.10.26 · ffmpeg 7.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error message
+      description: Whatever the app showed you. If you built from source, the terminal output helps a lot.
+      render: shell

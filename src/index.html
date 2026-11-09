@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YTDownload</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>YTDownload</h1>
+      <div id="tools" class="tools"></div>
+    </header>
+
+    <main>
+      <section class="card">
+        <label class="lbl" for="url">Pega la URL de un video o de una playlist</label>
+        <div class="row">
+          <input id="url" type="text" spellcheck="false"
+                 placeholder="https://www.youtube.com/playlist?list=…" />
+          <button id="probe" class="primary">Analizar</button>
+        </div>
+        <p id="probe-msg" class="msg"></p>
+      </section>
+
+      <section id="info" class="card hidden">
+        <div class="info-row">
+          <img id="thumb" alt="" />
+          <div class="info-text">
+            <span id="kind" class="badge"></span>
+            <h2 id="title"></h2>
+            <p id="meta" class="dim"></p>
+          </div>
+        </div>
+
+        <div id="folder-block" class="hidden">
+          <label class="chk"><input type="checkbox" id="use-folder" /> Crear una subcarpeta con el nombre de la playlist</label>
+          <input id="folder" type="text" spellcheck="false" disabled />
+          <p class="hint">Desmarcado, los archivos van directos a la carpeta que elegiste, sin crear nada.</p>
+        </div>
+
+        <fieldset>
+          <legend>Formato</legend>
+          <div class="seg">
+            <label><input type="radio" name="fmt" value="mp3" checked /><span>MP3 (solo audio)</span></label>
+            <label><input type="radio" name="fmt" value="video" /><span>Video (MP4)</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><span id="q-label">Calidad del audio</span></legend>
+          <select id="quality"></select>
+        </fieldset>
+
+        <fieldset>
+          <legend>Dónde se guarda</legend>
+          <div class="row">
+            <input id="dest" type="text" spellcheck="false" />
+            <button id="pick">Elegir…</button>
+          </div>
+          <p class="hint">Ruta final: <code id="target"></code></p>
+        </fieldset>
+
+        <fieldset id="conc-block">
+          <legend>Descargas a la vez</legend>
+          <label class="chk">
+            <select id="conc">
+              <option value="1">1 (más estable)</option>
+              <option value="2">2</option>
+              <option value="3" selected>3</option>
+              <option value="4">4</option>
+              <option value="5">5 (más rápido)</option>
+            </select>
+          </label>
+          <p class="hint">Solo afecta a playlists. Sin portadas, sin metadata, sin subtítulos: el MP3 o el MP4 y nada más.</p>
+        </fieldset>
+
+        <div class="actions">
+          <button id="go" class="primary big">Descargar</button>
+          <button id="stop" class="danger big hidden">Cancelar</button>
+          <button id="open" class="hidden">Abrir carpeta</button>
+        </div>
+
+        <p id="status" class="msg"></p>
+        <div id="overall" class="hidden">
+          <div class="bar"><div id="overall-fill"></div></div>
+          <p id="overall-txt" class="dim"></p>
+        </div>
+        <ul id="list"></ul>
+      </section>
+    </main>
+
+    <script src="main.js"></script>
+  </body>
+</html>

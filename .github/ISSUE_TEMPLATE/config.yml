@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: yt-dlp won't download a specific video
+    url: https://github.com/yt-dlp/yt-dlp/issues
+    about: If the download fails for one site or video but the app works otherwise, it's almost always a yt-dlp issue. Try the update button first.
+  - name: Question or idea
+    url: ../../discussions
+    about: For anything that isn't a bug report or a concrete feature request.

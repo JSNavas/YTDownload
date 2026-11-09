@@ -1,0 +1,89 @@
+name: Release
+
+# Tag a commit to publish installers:  git tag v0.1.0 && git push --tags
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            args: "--target aarch64-apple-darwin"
+            name: macOS (Apple Silicon)
+          - os: macos-latest
+            args: "--target x86_64-apple-darwin"
+            name: macOS (Intel)
+          - os: ubuntu-22.04
+            args: ""
+            name: Linux
+          - os: windows-latest
+            args: ""
+            name: Windows
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf build-essential curl wget file libssl-dev \
+            libgtk-3-dev libayatana-appindicator3-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "YTDownload ${{ github.ref_name }}"
+          releaseBody: |
+            ## Install
+
+            Download the file for your system below.
+
+            **You also need `yt-dlp` and `ffmpeg`:**
+            ```bash
+            # macOS
+            brew install yt-dlp ffmpeg
+            # Debian/Ubuntu
+            sudo apt install ffmpeg && sudo pipx install yt-dlp
+            # Windows
+            winget install yt-dlp.yt-dlp Gyan.FFmpeg
+            ```
+
+            **macOS:** these builds are not code-signed. On first launch macOS
+            will say the app is damaged. Allow it with:
+            ```bash
+            xattr -dr com.apple.quarantine /Applications/YTDownload.app
+            ```
+
+            See the full changelog below.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
