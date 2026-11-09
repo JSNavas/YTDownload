@@ -89,6 +89,24 @@ jobs:
             ```
 
             See the full changelog below.
+          # Se queda en borrador hasta que TODAS las plataformas terminen:
+          # lo publica el job de abajo. Así nadie se descarga un release a
+          # medias si una de las cuatro falla.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  publish:
+    name: Publish the release
+    # needs espera a los cuatro jobs de la matriz y solo sigue si todos
+    # terminaron bien. Si alguno falla, el release se queda en borrador.
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mark the release as published
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ github.ref_name }}" --draft=false --latest
