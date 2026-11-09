@@ -73,7 +73,9 @@ Puedes leértela en una tarde y arreglarla tú el día que YouTube cambie algo.
 - El botón de actualizar yt-dlp **solo aparece cuando de verdad hay una
   versión más nueva**.
 - La app **avisa cuando hay una versión nueva de sí misma** y te lleva a la
-  descarga. No se instala sola: te dice que existe y decides tú.
+  descarga. No se instala sola: te dice que existe y decides tú. En **Ajustes**
+  hay además un botón para **buscar actualizaciones** cuando quieras, junto a
+  la versión que tienes instalada.
 - El historial guarda hasta **10.000 descargas**.
 
 ## Cómo se usa

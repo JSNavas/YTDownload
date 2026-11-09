@@ -59,6 +59,12 @@ const I18N = {
     updAvail: (v) => `Nueva versión de yt-dlp (${v})`, update: "Actualizar",
     appUpdAvail: (v) => `YTDownload ${v} disponible`,
     appUpdGet: "Descargar",
+    version: "Versión",
+    checkUpdates: "Buscar actualizaciones",
+    checking: "Buscando…",
+    upToDate: (v) => `Estás en la última versión (${v})`,
+    updFound: (v) => `Hay una versión nueva: ${v}`,
+    updFailed: "No se pudo comprobar. ¿Hay conexión?",
     updating: "Actualizando…",
   },
   en: {
@@ -112,6 +118,12 @@ const I18N = {
     updAvail: (v) => `New yt-dlp version (${v})`, update: "Update",
     appUpdAvail: (v) => `YTDownload ${v} available`,
     appUpdGet: "Get it",
+    version: "Version",
+    checkUpdates: "Check for updates",
+    checking: "Checking…",
+    upToDate: (v) => `You are on the latest version (${v})`,
+    updFound: (v) => `A new version is available: ${v}`,
+    updFailed: "Could not check. Is there a connection?",
     updating: "Updating…",
   },
 };
@@ -801,6 +813,38 @@ function cancelItem(item) {
 
 /* ───────────────────────────────────────────────────────────── settings */
 
+// La versión la da el binario: tenerla escrita en el HTML significaba
+// mostrar siempre la misma por mucho que la app se actualizara.
+async function showVersion() {
+  try { $("app-ver").textContent = "v" + await invoke("app_version"); }
+  catch (_) { $("app-ver").textContent = ""; }
+}
+
+async function doCheckUpdates() {
+  const b = $("check-updates");
+  const msg = $("upd-msg");
+  b.disabled = true;
+  msg.className = "hint";
+  msg.textContent = t("checking");
+  let info = null, failed = false;
+  try { info = await invoke("check_app_update"); } catch (_) { failed = true; }
+  b.disabled = false;
+
+  if (failed) { msg.className = "hint"; msg.textContent = t("updFailed"); return; }
+  if (!info) {
+    const v = await invoke("app_version").catch(() => "");
+    msg.textContent = t("upToDate", v);
+    return;
+  }
+  msg.textContent = "";
+  const span = el("span");
+  span.textContent = t("updFound", info.version) + " ";
+  const link = el("button", "btn sm primary");
+  link.textContent = t("appUpdGet");
+  link.onclick = () => invoke("open_url", { url: info.url }).catch(() => {});
+  msg.append(span, link);
+}
+
 function openSettings() {
   $("conc").value = S.concurrency;
   $("conc-out").value = S.concurrency;
@@ -911,6 +955,7 @@ $("clear-history").onclick = async () => {
   catch (e) { toast("err", String(e)); }
 };
 
+$("check-updates").onclick = doCheckUpdates;
 $("open-settings").onclick = openSettings;
 $("close-settings").onclick = closeSettings;
 $("settings").onclick = (e) => { if (e.target === $("settings")) closeSettings(); };
@@ -943,5 +988,6 @@ loadSettings();
 fillQuality();
 applyI18n();
 refreshTools();
+showVersion();
 ensureDefaultDest().then(refreshDest);
 loadHistory();

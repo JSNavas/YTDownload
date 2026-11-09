@@ -1,6 +1,6 @@
 [package]
 name = "ytdownload"
-version = "0.1.3"
+version = "0.1.4"
 description = "YouTube downloader: playlists and videos, MP3 or MP4"
 authors = ["YTDownload contributors"]
 edition = "2021"

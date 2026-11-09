@@ -72,6 +72,8 @@ all of it in an afternoon, and fix it yourself when YouTube changes something.
 - The yt-dlp update button **only appears when a newer version actually exists**.
 - The app **tells you when a newer version of itself is out** and links to it.
   It does not install anything behind your back — it says one exists, you decide.
+  **Settings** also has a **check for updates** button and shows the version you
+  are running.
 - History keeps up to **10,000 downloads**.
 
 ## How to use it

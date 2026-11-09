@@ -172,6 +172,13 @@ async fn check_update() -> Option<String> {
     }
 }
 
+/// La versión con la que se compiló esta app. La interfaz la tenía escrita
+/// a mano y por eso siempre mostraba la misma.
+#[tauri::command]
+fn app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 /// ¿Hay una versión más nueva de YTDownload publicada?
 /// Compara la versión compilada con la última release de GitHub. Devuelve
 /// None ante cualquier fallo: no avisamos de algo que no podemos confirmar.
@@ -931,6 +938,7 @@ pub fn run() {
             check_tools,
             check_update,
             check_app_update,
+            app_version,
             open_url,
             update_ytdlp,
             probe_url,
