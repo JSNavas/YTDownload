@@ -32,21 +32,55 @@ Puedes leértela en una tarde y arreglarla tú el día que YouTube cambie algo.
 
 ## Qué hace
 
-- **Videos y playlists.** Pegas la URL y él distingue cuál es.
-- **MP3 o MP4**, eligiendo calidad (320–128 kbps, o de 4K a 480p).
-- **Tú decides dónde se guarda.** La subcarpeta con el nombre de la playlist es
-  opcional y viene desactivada, porque crear carpetas que nadie pidió molesta.
-  La ruta final se ve siempre antes de darle a Descargar.
-- **Solo el archivo que pediste.** Ni portadas, ni metadata, ni `.json` sueltos,
-  ni subtítulos. Se fuerza con flags negativos explícitos y con `--ignore-config`,
-  para que ninguna configuración global pueda colártelos.
+**Descargas**
+- Videos sueltos y playlists enteras, en **MP3** o **MP4**, eligiendo calidad
+  (320–128 kbps, o de 4K a 480p).
+- Si pegas la URL de un video que además está en una lista, te pregunta si
+  quieres **solo ese video o la playlist entera**. Al elegir el video usa la
+  URL limpia, para que yt-dlp no pueda arrastrar la lista de todos modos.
+- Hasta **10 descargas a la vez**, configurable.
+- **Solo el archivo que pediste.** Ni portadas, ni metadata, ni `.json`
+  sueltos, ni subtítulos: se fuerza con flags negativos explícitos y con
+  `--ignore-config`, para que ninguna configuración global pueda colártelos.
+
+**La cola**
+- Pestañas de **todas / en cola / descargando / completadas / fallidas**, con
+  su contador.
+- Lo que se está descargando se resalta y sube arriba; al terminar se queda
+  donde está en vez de saltar al fondo.
+- **Reintentar** una o todas las fallidas. Seleccionar varias y quitarlas.
+- **Quitar solo borra la fila, nunca el archivo del disco.**
+- **Ver en carpeta** abre el explorador con el archivo ya seleccionado.
+- Un video privado o borrado **no tumba la cola**: se salta y se cuenta.
+- Las filas se pintan de 10 en 10 al bajar, así una playlist de 300 no
+  redibuja la lista entera en cada actualización del progreso.
+
+**Se acuerda de todo**
+- La cola **se guarda en disco** y sigue ahí la próxima vez que abras la app.
+  Lo que quedó a medias vuelve a la cola, sin reanudarse solo.
+- Carpeta por defecto distinta para **música y video**, para no mezclarlas.
+- **Español e inglés**, y el idioma se recuerda.
+
+**Detalles**
 - **Sin timeouts inventados.** Que una playlist tarde horas no es un fallo.
-- **Un video roto no tumba la cola.** Los privados o borrados se saltan y se
-  cuentan; el resto sigue.
-- **Reanudable.** Guarda un histórico en la carpeta de destino, así que
-  relanzar no vuelve a bajar lo que ya tienes.
-- **Aviso de actualización honesto.** El botón solo aparece cuando de verdad
-  hay una versión más nueva de yt-dlp.
+- Avisos por cada canción al terminar o al fallar.
+- El botón de actualizar yt-dlp **solo aparece cuando de verdad hay una
+  versión más nueva**.
+
+## Cómo se usa
+
+1. **Pega la URL** de un video o de una playlist y pulsa **Analizar**.
+2. Si la URL lleva video y lista a la vez, elige **qué descargar**.
+3. Elige **MP3 o Video** y la calidad. Si es playlist, puedes crear una
+   **subcarpeta con su nombre** (viene desactivado). La ruta final se ve
+   siempre antes de descargar.
+4. **Añadir a la cola**: empieza sola, no hay que pulsar nada más.
+5. Sigue el progreso en las pestañas. Al acabar, el icono de carpeta de cada
+   fila te lleva al archivo.
+
+En **Ajustes** (el engranaje) cambias el idioma, cuántas descargas van a la
+vez, las carpetas por defecto, y puedes borrar el historial (que no toca
+ningún archivo descargado).
 
 ## Instalación
 
@@ -115,8 +149,24 @@ src/                      Frontend: HTML/CSS/JS a pelo, sin framework ni build
 src-tauri/src/lib.rs      Backend: localiza las herramientas, analiza URLs, descarga
 ```
 
+La cola vive en el frontend y el backend descarga **un video por llamada**:
+eso es lo que permite tener estado, reintentos y cancelación por item. yt-dlp
+nunca ve la playlist entera.
+
 El progreso se parsea con un `--progress-template` propio, mucho más fiable que
-leer la salida humana de yt-dlp, y llega a la interfaz como eventos.
+leer la salida humana de yt-dlp, y llega a la interfaz como eventos. Ojo con un
+detalle que cuesta encontrar: `--print` pone a yt-dlp en modo silencioso y eso
+**suprime las líneas de progreso**, así que hacen falta `--progress --no-quiet`
+para recuperarlas.
+
+El backend expone 14 comandos: `check_tools`, `check_update`, `update_ytdlp`,
+`probe_url`, `download_item`, `cancel_item`, `cancel_all`, `resolve_target`,
+`default_dest`, `open_folder`, `reveal_file`, `load_history`, `save_history` y
+`clear_history`.
+
+El historial se guarda en la carpeta de datos del usuario, con escritura
+atómica (archivo temporal y renombrado) para que una caída a media escritura
+no lo deje truncado.
 
 ### Qué sale a internet, todo
 
@@ -134,8 +184,9 @@ Todo lo demás es `yt-dlp` hablando con YouTube, como es de esperar.
 Las contribuciones son bienvenidas de verdad: es poco código y se lee bien, así
 que es un buen sitio para empezar. Mira [CONTRIBUTING.md](CONTRIBUTING.md).
 
-La interfaz está solo en español, así que **traducirla (i18n) es ahora mismo la
-contribución más útil**.
+La interfaz viene en español e inglés. **Añadir un tercer idioma es un buen
+primer aporte**: todos los textos están en un único objeto `I18N` dentro de
+`src/main.js`, así que un idioma nuevo es una entrada más.
 
 ## Aviso legal
 

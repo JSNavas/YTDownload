@@ -32,21 +32,53 @@ all of it in an afternoon, and fix it yourself when YouTube changes something.
 
 ## Features
 
-- **Videos and playlists.** Paste a URL, it figures out which one it is.
-- **MP3 or MP4**, with a quality picker (320–128 kbps, or 4K down to 480p).
-- **You decide where it goes.** Optional subfolder named after the playlist —
-  off by default, because creating folders you didn't ask for is rude. The
-  final path is always shown before you press Download.
+**Downloading**
+- Single videos and whole playlists, as **MP3** or **MP4**, with a quality
+  picker (320–128 kbps, or 4K down to 480p).
+- Paste the URL of a video that also belongs to a list and it asks whether you
+  want **just that video or the whole playlist**. Picking the video uses the
+  cleaned URL, so yt-dlp cannot pull the list in anyway.
+- Up to **10 simultaneous downloads**, configurable.
 - **Only the file you asked for.** No cover art, no metadata, no `.json`
   sidecars, no subtitles — enforced with explicit negative flags *and*
   `--ignore-config`, so no stray global config can slip them back in.
+
+**The queue**
+- Tabs for **all / queued / downloading / completed / failed**, each with a count.
+- Active downloads are highlighted and sorted to the top; when one finishes it
+  stays put instead of jumping to the bottom.
+- **Retry** one failure or all of them. Select several and remove them.
+- **Remove only drops the row — it never deletes the downloaded file.**
+- **Show in folder** opens your file manager with the file already selected.
+- A private or deleted video **does not kill the queue**: it is skipped and counted.
+- Rows render 10 at a time as you scroll, so a 300-item playlist does not
+  rebuild the whole list on every progress tick.
+
+**It remembers**
+- The queue is **saved to disk** and restored next time you open the app.
+  Anything left mid-download returns as queued rather than resuming on its own.
+- Separate default folders for **music and video**, so they never mix.
+- **English and Spanish**, and your choice is remembered.
+
+**Details**
 - **No invented timeouts.** A long playlist is not a failure.
-- **A broken video doesn't kill the queue.** Private or deleted entries are
-  skipped and counted; the rest keep going.
-- **Resumable.** A download archive lives in the destination folder, so
-  re-running never re-downloads what you already have.
-- **Honest update check.** The update button only appears when a newer yt-dlp
-  actually exists.
+- A notification per song, on success and on failure.
+- The yt-dlp update button **only appears when a newer version actually exists**.
+
+## How to use it
+
+1. **Paste the URL** of a video or a playlist and press **Analyse**.
+2. If the URL carries both a video and a list, pick **what to download**.
+3. Choose **MP3 or Video** and the quality. For a playlist you can create a
+   **subfolder named after it** (off by default). The final path is always
+   shown before you download.
+4. **Add to queue** — it starts on its own, nothing else to press.
+5. Follow progress in the tabs. When a download finishes, the folder icon on
+   its row takes you straight to the file.
+
+**Settings** (the gear icon) holds the language, how many downloads run at
+once, the default folders, and a button to clear the history — which never
+touches any downloaded file.
 
 ## Install
 
@@ -114,13 +146,23 @@ src/                      Frontend — plain HTML/CSS/JS, no framework, no build
 src-tauri/src/lib.rs      Backend — finds the tools, inspects URLs, runs downloads
 ```
 
-The backend exposes eight commands: `check_tools`, `check_update`,
-`update_ytdlp`, `probe_url`, `start_download`, `cancel_download`,
-`resolve_target` and `open_folder`.
+The queue lives in the frontend and the backend downloads **one video per
+call**. That is what makes per-item state, retries and per-item cancellation
+possible — yt-dlp never sees the whole playlist.
 
 Progress is parsed from a custom `--progress-template`, which is far more
 reliable than scraping yt-dlp's human-readable output, and streamed to the UI
-as `download-progress` events.
+as events. One sharp edge worth knowing: `--print` puts yt-dlp into quiet mode,
+and that **suppresses progress lines entirely**, so `--progress --no-quiet` are
+required to get them back.
+
+The backend exposes 14 commands: `check_tools`, `check_update`, `update_ytdlp`,
+`probe_url`, `download_item`, `cancel_item`, `cancel_all`, `resolve_target`,
+`default_dest`, `open_folder`, `reveal_file`, `load_history`, `save_history`
+and `clear_history`.
+
+History is stored in the user data directory and written atomically (temp file
+plus rename), so a crash mid-write cannot leave it truncated.
 
 ### Network activity, in full
 
@@ -141,8 +183,9 @@ makes it a good one to start with. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Good places to start are marked
 [`good first issue`](../../issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
-The interface is currently Spanish-only, so **adding i18n is the single most
-useful contribution right now**.
+The interface ships in English and Spanish. **Adding a third language is a
+good first contribution**: every string lives in one `I18N` object in
+`src/main.js`, so a new locale is one more entry in it.
 
 ## Legal
 

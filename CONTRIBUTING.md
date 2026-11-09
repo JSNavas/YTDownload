@@ -60,11 +60,14 @@ playlist. Most bugs here only show up against real YouTube responses.
 
 ## Good first issues
 
-- **Internationalisation.** The UI is hardcoded Spanish. Extracting the strings
-  and adding English would help the most people.
-- Windows and Linux testing — the code paths exist but get far less use.
-- Download queue: let the user add several URLs before starting.
-- Remember the last destination folder between launches.
+- **A third language.** English and Spanish are done; every string lives in the
+  `I18N` object at the top of `src/main.js`, so another locale is one entry.
+- **Windows and Linux testing.** The code paths exist but get far less use,
+  especially `reveal_file` and the tool detection in `find_tool`.
+- **Thumbnails in the queue rows** — a "YouTube" badge and the duration
+  overlaid on the image, rather than as text beside it.
+- **Pause and resume** a download, rather than only cancel and retry.
+- **Bandwidth limit** (`--limit-rate`), exposed in Settings.
 
 ## Commit messages
 
