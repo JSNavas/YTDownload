@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Mutex;
@@ -186,9 +187,19 @@ pub struct Entry {
     duration: Option<f64>,
 }
 
+/// El video concreto al que apunta una URL que además lleva `list=`.
+#[derive(Serialize)]
+pub struct VideoRef {
+    title: String,
+    url: String,
+    duration: Option<f64>,
+    thumbnail: Option<String>,
+}
+
 #[derive(Serialize)]
 pub struct Probe {
-    kind: String, // "video" | "playlist"
+    /// "video" | "playlist" | "both" (un video que además pertenece a una lista)
+    kind: String,
     title: String,
     uploader: Option<String>,
     thumbnail: Option<String>,
@@ -197,6 +208,8 @@ pub struct Probe {
     /// Nombre de carpeta ya saneado donde iría una playlist.
     folder: Option<String>,
     entries: Vec<Entry>,
+    /// Solo con kind = "both": el video al que apuntaba la URL.
+    video: Option<VideoRef>,
 }
 
 /// Quita los caracteres que no valen en un nombre de carpeta, sin destrozar acentos.
@@ -219,6 +232,37 @@ fn sanitize(name: &str) -> String {
         out = out.chars().take(120).collect::<String>().trim().to_string();
     }
     out
+}
+
+/// Saca el id de 11 caracteres de una URL de YouTube, si lo lleva.
+fn video_id_of(url: &str) -> Option<String> {
+    let take11 = |rest: &str| {
+        let id: String = rest
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
+            .collect();
+        if id.len() == 11 {
+            Some(id)
+        } else {
+            None
+        }
+    };
+    if let Some(i) = url.find("v=") {
+        if let Some(id) = take11(&url[i + 2..]) {
+            return Some(id);
+        }
+    }
+    if let Some(i) = url.find("youtu.be/") {
+        if let Some(id) = take11(&url[i + 9..]) {
+            return Some(id);
+        }
+    }
+    if let Some(i) = url.find("/shorts/") {
+        if let Some(id) = take11(&url[i + 8..]) {
+            return Some(id);
+        }
+    }
+    None
 }
 
 #[tauri::command]
@@ -287,8 +331,29 @@ async fn probe_url(url: String) -> Result<Probe, String> {
             })
             .collect();
 
+        // Una URL tipo .../watch?v=ID&list=... es ambigua: puede querer decir
+        // ese video o la lista entera. Devolvemos las dos cosas y que elija
+        // el usuario, en vez de decidir por él.
+        let wanted = video_id_of(&url);
+        let picked = wanted.as_ref().and_then(|id| {
+            entries
+                .iter()
+                .find(|e| e.url.contains(id.as_str()))
+                .map(|e| VideoRef {
+                    title: e.title.clone(),
+                    url: e.url.clone(),
+                    duration: e.duration,
+                    thumbnail: Some(format!("https://i.ytimg.com/vi/{id}/mqdefault.jpg")),
+                })
+        });
+
         Ok(Probe {
-            kind: "playlist".into(),
+            kind: if picked.is_some() {
+                "both".into()
+            } else {
+                "playlist".into()
+            },
+            video: picked,
             folder: Some(sanitize(&title)),
             uploader: v
                 .get("uploader")
@@ -307,6 +372,7 @@ async fn probe_url(url: String) -> Result<Probe, String> {
     } else {
         Ok(Probe {
             kind: "video".into(),
+            video: None,
             folder: None,
             uploader: v
                 .get("uploader")
@@ -347,42 +413,40 @@ fn friendly_error(stderr: &str) -> String {
 }
 
 // ------------------------------------------------------------------- descarga
+//
+// La cola vive en el frontend: aquí descargamos UN video por llamada. Eso es lo
+// que permite estados por item, reintentos individuales y cancelar uno solo sin
+// tocar los demás. yt-dlp nunca ve la playlist entera.
+
+/// Procesos vivos, indexados por el id del item que los lanzó.
+#[derive(Default)]
+pub struct Running(Mutex<HashMap<String, Child>>);
 
 #[derive(Deserialize)]
-// El frontend manda camelCase; Tauri solo convierte los argumentos del
-// comando, no los campos de un struct anidado. De ahí el rename_all.
 #[serde(rename_all = "camelCase")]
-pub struct DownloadOpts {
+pub struct ItemOpts {
+    id: String,
     url: String,
     /// "mp3" | "video"
     format: String,
-    /// mp3: "320" | "256" | "192" | "128" | "best". video: "2160" | "1440" | "1080" | "720" | "480" | "best"
     quality: String,
-    /// Carpeta base elegida por el usuario.
+    /// Carpeta final, ya resuelta por el frontend.
     dest: String,
-    /// Para playlists: subcarpeta donde va todo (ya saneada por probe_url, editable).
-    folder: Option<String>,
-    is_playlist: bool,
-    /// Descargas en paralelo dentro de una playlist (1 = secuencial).
-    concurrency: u32,
+    /// Posición en la playlist, para numerar el archivo. None = video suelto.
+    index: Option<u32>,
 }
 
 #[derive(Serialize, Clone)]
-struct Progress {
-    phase: String, // "start" | "item" | "progress" | "post" | "done" | "error" | "skipped"
-    index: u32,
-    total: u32,
-    title: String,
+struct ItemEvent {
+    id: String,
+    /// "progress" | "post" | "skipped"
+    phase: String,
     percent: f64,
     speed: String,
     eta: String,
     message: String,
 }
 
-#[derive(Default)]
-pub struct Running(Mutex<Option<Child>>);
-
-/// Carpeta final donde acabará la descarga. Se calcula igual en Rust y se muestra en la UI.
 #[tauri::command]
 fn resolve_target(dest: String, folder: Option<String>, is_playlist: bool) -> String {
     let mut p = PathBuf::from(&dest);
@@ -395,8 +459,7 @@ fn resolve_target(dest: String, folder: Option<String>, is_playlist: bool) -> St
 }
 
 #[tauri::command]
-fn default_dest(app: tauri::AppHandle, format: String) -> String {
-    let _ = &app;
+fn default_dest(format: String) -> String {
     let base = if format == "mp3" {
         dirs::audio_dir().or_else(dirs::home_dir)
     } else {
@@ -409,52 +472,153 @@ fn default_dest(app: tauri::AppHandle, format: String) -> String {
 
 #[tauri::command]
 fn open_folder(path: String) -> Result<(), String> {
-    std::process::Command::new("/usr/bin/open")
-        .arg(&path)
-        .spawn()
-        .map_err(|e| e.to_string())?;
+    opener_open(&path, false)
+}
+
+/// Abre el Finder con el archivo seleccionado, en vez de solo la carpeta.
+#[tauri::command]
+fn reveal_file(path: String) -> Result<(), String> {
+    opener_open(&path, true)
+}
+
+fn opener_open(path: &str, reveal: bool) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let mut c = std::process::Command::new("/usr/bin/open");
+        if reveal {
+            c.arg("-R");
+        }
+        c.arg(path).spawn().map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let mut c = std::process::Command::new("explorer");
+        if reveal {
+            c.arg(format!("/select,{path}"));
+        } else {
+            c.arg(path);
+        }
+        c.spawn().map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    {
+        // xdg-open no sabe seleccionar: abrimos la carpeta contenedora.
+        let target = if reveal {
+            PathBuf::from(path)
+                .parent()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| path.to_string())
+        } else {
+            path.to_string()
+        };
+        std::process::Command::new("xdg-open")
+            .arg(target)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+}
+
+// ──────────────────────────────────────────────────────────────── historial
+//
+// La cola se guarda en disco para que al reabrir la app siga estando lo de
+// antes. Se guarda JSON tal cual lo manda el frontend: así añadir un campo
+// nuevo a un item no obliga a tocar el backend.
+
+fn history_path() -> Result<PathBuf, String> {
+    let mut p = dirs::data_dir().ok_or("no encuentro la carpeta de datos del usuario")?;
+    p.push("YTDownload");
+    std::fs::create_dir_all(&p).map_err(|e| format!("no se pudo crear {}: {e}", p.display()))?;
+    p.push("history.json");
+    Ok(p)
+}
+
+#[tauri::command]
+fn load_history() -> Vec<serde_json::Value> {
+    // Un historial ilegible o inexistente no es un error: se empieza vacío.
+    history_path()
+        .ok()
+        .and_then(|p| std::fs::read(p).ok())
+        .and_then(|b| serde_json::from_slice::<Vec<serde_json::Value>>(&b).ok())
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+fn save_history(items: Vec<serde_json::Value>) -> Result<(), String> {
+    let p = history_path()?;
+    // Un tope para que no crezca sin fin tras muchas playlists.
+    let trimmed: Vec<_> = if items.len() > 500 {
+        items[items.len() - 500..].to_vec()
+    } else {
+        items
+    };
+    let data = serde_json::to_vec_pretty(&trimmed).map_err(|e| e.to_string())?;
+    // Escritura atómica: si la app muere a media escritura, el historial
+    // anterior sigue intacto en vez de quedar truncado.
+    let tmp = p.with_extension("json.tmp");
+    std::fs::write(&tmp, &data).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &p).map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[tauri::command]
-fn cancel_download(state: State<'_, Running>) -> Result<(), String> {
-    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
-    if let Some(child) = guard.as_mut() {
+fn clear_history() -> Result<(), String> {
+    let p = history_path()?;
+    if p.exists() {
+        std::fs::remove_file(&p).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn cancel_item(id: String, state: State<'_, Running>) -> Result<(), String> {
+    let mut map = state.0.lock().map_err(|e| e.to_string())?;
+    if let Some(child) = map.get_mut(&id) {
         let _ = child.start_kill();
     }
-    *guard = None;
+    map.remove(&id);
     Ok(())
 }
 
 #[tauri::command]
-async fn start_download(app: tauri::AppHandle, opts: DownloadOpts) -> Result<String, String> {
-    let bin =
-        find_tool("yt-dlp").ok_or("yt-dlp no está instalado. Ejecuta: brew install yt-dlp")?;
+fn cancel_all(state: State<'_, Running>) -> Result<(), String> {
+    let mut map = state.0.lock().map_err(|e| e.to_string())?;
+    for (_, child) in map.iter_mut() {
+        let _ = child.start_kill();
+    }
+    map.clear();
+    Ok(())
+}
+
+/// Descarga un único video. Devuelve la ruta del archivo resultante.
+#[tauri::command]
+async fn download_item(app: tauri::AppHandle, opts: ItemOpts) -> Result<String, String> {
+    let bin = find_tool("yt-dlp").ok_or("yt-dlp no está instalado")?;
     let ffmpeg = find_tool("ffmpeg");
 
-    let target = PathBuf::from(resolve_target(
-        opts.dest.clone(),
-        opts.folder.clone(),
-        opts.is_playlist,
-    ));
+    let target = PathBuf::from(&opts.dest);
     std::fs::create_dir_all(&target)
         .map_err(|e| format!("no se pudo crear {}: {e}", target.display()))?;
 
-    // Plantilla de nombre: en playlist numeramos para que el orden se mantenga.
-    let out_tpl = if opts.is_playlist {
-        target.join("%(playlist_index)03d - %(title)s.%(ext)s")
-    } else {
-        target.join("%(title)s.%(ext)s")
+    let out_tpl = match opts.index {
+        Some(i) => target.join(format!("{i:03} - %(title)s.%(ext)s")),
+        None => target.join("%(title)s.%(ext)s"),
     };
 
     let mut args: Vec<String> = vec![
-        // --ignore-config: nunca leemos ~/.config/yt-dlp/config, para que una
-        // config vieja no pueda reintroducir nada que el usuario no pidió.
+        // Nunca leemos la config global del usuario: nada puede colarse.
         "--ignore-config".into(),
         "--newline".into(),
         "--no-mtime".into(),
-        // Negativos explícitos: aquí no hay portadas, ni metadata, ni .json,
-        // ni subtítulos, ni ficheros sueltos. Solo el archivo que pediste.
+        "--no-playlist".into(),
+        // Imprescindibles: `--print` activa el modo silencioso de yt-dlp y
+        // eso se lleva por delante las líneas de progreso, dejando la barra
+        // clavada en 0%. Estos dos las devuelven.
+        "--progress".into(),
+        "--no-quiet".into(),
+        // Solo el archivo pedido. Ni portadas, ni metadata, ni sidecars.
         "--no-embed-thumbnail".into(),
         "--no-embed-metadata".into(),
         "--no-write-thumbnail".into(),
@@ -475,34 +639,15 @@ async fn start_download(app: tauri::AppHandle, opts: DownloadOpts) -> Result<Str
         "30".into(),
         "-o".into(),
         out_tpl.display().to_string(),
-        // Progreso en un formato que parseamos sin ambigüedad.
         "--progress-template".into(),
-        "MF|%(info.playlist_index)s|%(info.title)s|%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s".into(),
+        "YTD|%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s".into(),
         "--print".into(),
-        "before_dl:MFITEM|%(playlist_index)s|%(title)s".into(),
-        "--print".into(),
-        "after_move:MFFILE|%(filepath)s".into(),
+        "after_move:YTDFILE|%(filepath)s".into(),
     ];
 
     if let Some(f) = &ffmpeg {
         args.push("--ffmpeg-location".into());
         args.push(f.display().to_string());
-    }
-
-    if opts.is_playlist {
-        args.push("--yes-playlist".into());
-        // Sigue con el resto si un video falla, en vez de abortar toda la playlist.
-        args.push("--ignore-errors".into());
-        // Archivo de histórico: si relanzas, no baja de nuevo lo que ya está.
-        args.push("--download-archive".into());
-        args.push(target.join(".ytdownload-archive.txt").display().to_string());
-        let n = opts.concurrency.clamp(1, 5);
-        if n > 1 {
-            args.push("-N".into());
-            args.push(n.to_string());
-        }
-    } else {
-        args.push("--no-playlist".into());
     }
 
     if opts.format == "mp3" {
@@ -549,158 +694,98 @@ async fn start_download(app: tauri::AppHandle, opts: DownloadOpts) -> Result<Str
 
     {
         let state = app.state::<Running>();
-        let mut guard = state.0.lock().map_err(|e| e.to_string())?;
-        *guard = Some(child);
+        let mut map = state.0.lock().map_err(|e| e.to_string())?;
+        map.insert(opts.id.clone(), child);
     }
 
-    let emit = |app: &tauri::AppHandle, p: Progress| {
-        let _ = app.emit("download-progress", p);
-    };
-
-    // stderr en paralelo: avisos y errores por item.
-    let app_err = app.clone();
+    // Guardamos stderr completo: si falla, el último renglón explica por qué.
+    let errbuf = std::sync::Arc::new(Mutex::new(String::new()));
+    let errbuf2 = errbuf.clone();
     tokio::spawn(async move {
         let mut lines = BufReader::new(stderr).lines();
         while let Ok(Some(line)) = lines.next_line().await {
-            if line.trim().is_empty() {
-                continue;
-            }
-            let lower = line.to_lowercase();
-            if lower.starts_with("error") || lower.contains("error:") {
-                let _ = app_err.emit(
-                    "download-progress",
-                    Progress {
-                        phase: "error".into(),
-                        index: 0,
-                        total: 0,
-                        title: String::new(),
-                        percent: 0.0,
-                        speed: String::new(),
-                        eta: String::new(),
-                        message: friendly_error(&line),
-                    },
-                );
+            if let Ok(mut b) = errbuf2.lock() {
+                b.push_str(&line);
+                b.push('\n');
             }
         }
     });
 
+    let id = opts.id.clone();
+    let mut filepath = String::new();
+    let mut skipped = false;
     let mut lines = BufReader::new(stdout).lines();
-    let mut cur_index: u32 = 0;
-    let mut cur_title = String::new();
 
     while let Ok(Some(line)) = lines.next_line().await {
-        if let Some(rest) = line.strip_prefix("MFITEM|") {
-            let mut it = rest.splitn(2, '|');
-            let idx = it.next().unwrap_or("").trim();
-            cur_index = idx.parse().unwrap_or(cur_index + 1);
-            cur_title = it.next().unwrap_or("").trim().to_string();
-            emit(
-                &app,
-                Progress {
-                    phase: "item".into(),
-                    index: cur_index,
-                    total: 0,
-                    title: cur_title.clone(),
-                    percent: 0.0,
+        if let Some(rest) = line.strip_prefix("YTD|") {
+            let f: Vec<&str> = rest.split('|').collect();
+            if f.len() >= 3 {
+                let percent = f[0]
+                    .trim()
+                    .trim_end_matches('%')
+                    .parse::<f64>()
+                    .unwrap_or(0.0);
+                let _ = app.emit(
+                    "item",
+                    ItemEvent {
+                        id: id.clone(),
+                        phase: "progress".into(),
+                        percent,
+                        speed: f[1].trim().to_string(),
+                        eta: f[2].trim().to_string(),
+                        message: String::new(),
+                    },
+                );
+            }
+        } else if let Some(p) = line.strip_prefix("YTDFILE|") {
+            filepath = p.trim().to_string();
+        } else if line.contains("has already been downloaded") {
+            skipped = true;
+        } else if line.starts_with("[ExtractAudio]") || line.starts_with("[Merger]") {
+            let _ = app.emit(
+                "item",
+                ItemEvent {
+                    id: id.clone(),
+                    phase: "post".into(),
+                    percent: 100.0,
                     speed: String::new(),
                     eta: String::new(),
                     message: String::new(),
                 },
             );
-        } else if let Some(rest) = line.strip_prefix("MF|") {
-            let f: Vec<&str> = rest.split('|').collect();
-            if f.len() >= 5 {
-                if let Ok(i) = f[0].trim().parse::<u32>() {
-                    cur_index = i;
-                }
-                if !f[1].trim().is_empty() && f[1].trim() != "NA" {
-                    cur_title = f[1].trim().to_string();
-                }
-                let percent = f[2]
-                    .trim()
-                    .trim_end_matches('%')
-                    .parse::<f64>()
-                    .unwrap_or(0.0);
-                emit(
-                    &app,
-                    Progress {
-                        phase: "progress".into(),
-                        index: cur_index,
-                        total: 0,
-                        title: cur_title.clone(),
-                        percent,
-                        speed: f[3].trim().to_string(),
-                        eta: f[4].trim().to_string(),
-                        message: String::new(),
-                    },
-                );
-            }
-        } else if let Some(path) = line.strip_prefix("MFFILE|") {
-            emit(
-                &app,
-                Progress {
-                    phase: "done".into(),
-                    index: cur_index,
-                    total: 0,
-                    title: cur_title.clone(),
-                    percent: 100.0,
-                    speed: String::new(),
-                    eta: String::new(),
-                    message: path.trim().to_string(),
-                },
-            );
-        } else if line.contains("has already been downloaded") {
-            emit(
-                &app,
-                Progress {
-                    phase: "skipped".into(),
-                    index: cur_index,
-                    total: 0,
-                    title: cur_title.clone(),
-                    percent: 100.0,
-                    speed: String::new(),
-                    eta: String::new(),
-                    message: "ya estaba descargado".into(),
-                },
-            );
-        } else if line.starts_with("[ExtractAudio]") || line.starts_with("[Merger]") {
-            emit(
-                &app,
-                Progress {
-                    phase: "post".into(),
-                    index: cur_index,
-                    total: 0,
-                    title: cur_title.clone(),
-                    percent: 100.0,
-                    speed: String::new(),
-                    eta: String::new(),
-                    message: "convirtiendo…".into(),
-                },
-            );
         }
     }
 
-    // Esperamos el final sin ningún timeout artificial: una playlist larga
-    // puede tardar horas y eso no es un fallo.
+    // Sin timeout: una descarga lenta no es una descarga fallida.
     let status = {
         let state = app.state::<Running>();
         let mut taken = {
-            let mut guard = state.0.lock().map_err(|e| e.to_string())?;
-            guard.take()
+            let mut map = state.0.lock().map_err(|e| e.to_string())?;
+            map.remove(&id)
         };
         match taken.as_mut() {
             Some(c) => c.wait().await.map_err(|e| e.to_string())?.code(),
-            // cancel_download se llevó el proceso.
-            None => return Ok("cancelado".into()),
+            // cancel_item se llevó el proceso.
+            None => return Err("CANCELLED".into()),
         }
     };
 
     match status {
-        Some(0) => Ok(target.display().to_string()),
-        // 1 con --ignore-errors = algunos items fallaron, el resto bajó bien.
-        Some(1) if opts.is_playlist => Ok(target.display().to_string()),
-        Some(c) => Err(format!("yt-dlp terminó con código {c}")),
-        None => Ok("cancelado".into()),
+        Some(0) => {
+            if filepath.is_empty() && skipped {
+                Ok(String::new())
+            } else {
+                Ok(filepath)
+            }
+        }
+        None => Err("CANCELLED".into()),
+        Some(_) => {
+            let msg = errbuf
+                .lock()
+                .map(|b| friendly_error(&b))
+                .unwrap_or_else(|_| "error desconocido".into());
+            Err(msg)
+        }
     }
 }
 
@@ -715,11 +800,16 @@ pub fn run() {
             check_update,
             update_ytdlp,
             probe_url,
-            start_download,
-            cancel_download,
+            download_item,
+            cancel_item,
+            cancel_all,
             resolve_target,
             default_dest,
-            open_folder
+            open_folder,
+            reveal_file,
+            load_history,
+            save_history,
+            clear_history
         ])
         .run(tauri::generate_context!())
         .expect("error al arrancar la app");

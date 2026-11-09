@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/app-icon.svg" width="104" alt="" />
+
 # YTDownload
 
 **A YouTube downloader that does exactly what you asked for. Nothing else.**
