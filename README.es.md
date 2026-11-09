@@ -44,8 +44,14 @@ Puedes leértela en una tarde y arreglarla tú el día que YouTube cambie algo.
   `--ignore-config`, para que ninguna configuración global pueda colártelos.
 
 **La cola**
-- Pestañas de **todas / en cola / descargando / completadas / fallidas**, con
-  su contador.
+- Pestañas de **todas / en cola / descargando / pendientes / completadas /
+  fallidas**, con su contador.
+- **Descargar más tarde**: en vez de encolar, guarda lo analizado en
+  **Pendientes**, donde no se descarga nada hasta que tú lo digas — fila a
+  fila, las seleccionadas, o todas de golpe.
+- La barra de acciones es **contextual**: en Fallidas ofrece "quitar
+  fallidas", en Pendientes solo "descargar ahora", y los botones que no
+  tienen nada sobre lo que actuar no aparecen.
 - Lo que se está descargando se resalta y sube arriba; al terminar se queda
   donde está en vez de saltar al fondo.
 - **Reintentar** una o todas las fallidas. Seleccionar varias y quitarlas.
@@ -66,6 +72,9 @@ Puedes leértela en una tarde y arreglarla tú el día que YouTube cambie algo.
 - Avisos por cada canción al terminar o al fallar.
 - El botón de actualizar yt-dlp **solo aparece cuando de verdad hay una
   versión más nueva**.
+- La app **avisa cuando hay una versión nueva de sí misma** y te lleva a la
+  descarga. No se instala sola: te dice que existe y decides tú.
+- El historial guarda hasta **10.000 descargas**.
 
 ## Cómo se usa
 
@@ -74,7 +83,8 @@ Puedes leértela en una tarde y arreglarla tú el día que YouTube cambie algo.
 3. Elige **MP3 o Video** y la calidad. Si es playlist, puedes crear una
    **subcarpeta con su nombre** (viene desactivado). La ruta final se ve
    siempre antes de descargar.
-4. **Añadir a la cola**: empieza sola, no hay que pulsar nada más.
+4. **Añadir a la cola**: empieza sola, no hay que pulsar nada más. O
+   **Descargar más tarde**, y se queda en Pendientes esperando.
 5. Sigue el progreso en las pestañas. Al acabar, el icono de carpeta de cada
    fila te lleva al archivo.
 

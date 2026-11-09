@@ -44,7 +44,13 @@ all of it in an afternoon, and fix it yourself when YouTube changes something.
   `--ignore-config`, so no stray global config can slip them back in.
 
 **The queue**
-- Tabs for **all / queued / downloading / completed / failed**, each with a count.
+- Tabs for **all / queued / downloading / pending / completed / failed**, each
+  with a count.
+- **Download later**: instead of queueing, it parks what you analysed in
+  **Pending**, where nothing downloads until you say so — one row, the
+  selected ones, or all of them.
+- The action bar is **contextual**: Failed offers "clear failed", Pending
+  offers only "download now", and buttons with nothing to act on stay hidden.
 - Active downloads are highlighted and sorted to the top; when one finishes it
   stays put instead of jumping to the bottom.
 - **Retry** one failure or all of them. Select several and remove them.
@@ -64,6 +70,9 @@ all of it in an afternoon, and fix it yourself when YouTube changes something.
 - **No invented timeouts.** A long playlist is not a failure.
 - A notification per song, on success and on failure.
 - The yt-dlp update button **only appears when a newer version actually exists**.
+- The app **tells you when a newer version of itself is out** and links to it.
+  It does not install anything behind your back — it says one exists, you decide.
+- History keeps up to **10,000 downloads**.
 
 ## How to use it
 
@@ -72,7 +81,8 @@ all of it in an afternoon, and fix it yourself when YouTube changes something.
 3. Choose **MP3 or Video** and the quality. For a playlist you can create a
    **subfolder named after it** (off by default). The final path is always
    shown before you download.
-4. **Add to queue** — it starts on its own, nothing else to press.
+4. **Add to queue** — it starts on its own, nothing else to press. Or
+   **Download later**, and it waits in Pending until you want it.
 5. Follow progress in the tabs. When a download finishes, the folder icon on
    its row takes you straight to the file.
 
