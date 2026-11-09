@@ -1,6 +1,6 @@
 [package]
 name = "ytdownload"
-version = "0.1.4"
+version = "0.1.5"
 description = "YouTube downloader: playlists and videos, MP3 or MP4"
 authors = ["YTDownload contributors"]
 edition = "2021"
@@ -22,8 +22,12 @@ tokio = { version = "1", features = ["process", "io-util", "rt", "macros", "sync
 dirs = "5"
 
 [profile.release]
-codegen-units = 1
-lto = true
+# "thin" conserva casi toda la optimización de un LTO completo y enlaza
+# mucho más rápido; codegen-units > 1 además paraleliza. El coste es un
+# binario algo mayor, irrelevante en una app de ~4 MB que ni siquiera
+# empaqueta yt-dlp ni ffmpeg.
+codegen-units = 16
+lto = "thin"
 opt-level = 3
 panic = "abort"
 strip = true
