@@ -72,13 +72,26 @@ Si falta alguno, la app te dice cuál y el comando exacto para instalarlo.
 
 En [Releases](../../releases).
 
-> **macOS:** la app no está firmada (una cuenta de Apple Developer cuesta 99 $/año).
-> La primera vez macOS dirá que está dañada o que viene de un desarrollador
-> no identificado. Para permitirla:
-> ```bash
-> xattr -dr com.apple.quarantine /Applications/YTDownload.app
-> ```
-> O compílala tú, que son dos minutos.
+#### En macOS, la primera vez
+
+YTDownload no está firmado ni notarizado por Apple (hace falta una cuenta de
+desarrollador, 99 $/año), así que macOS lo bloquea al abrirlo. Es cosa de una vez:
+
+1. Abre el `.dmg` y arrastra **YTDownload** a tu carpeta Aplicaciones.
+2. Ábrelo. macOS dirá que no se puede comprobar o que viene de un
+   desarrollador no identificado. Dale a **Aceptar** o **Hecho**.
+3. Ve a **Ajustes del Sistema → Privacidad y seguridad**, baja hasta el aviso
+   sobre YTDownload y pulsa **Abrir de todos modos**.
+4. Vuelve a abrirlo y confirma. A partir de aquí se abre con doble clic
+   como cualquier otra app.
+
+Si prefieres la terminal, una línea hace lo mismo:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/YTDownload.app
+```
+
+O compílalo tú, que tarda dos minutos y evita el aviso del todo.
 
 ### Compilar desde el código
 

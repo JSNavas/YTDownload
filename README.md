@@ -72,13 +72,25 @@ If either is missing, the app tells you which one and the exact command to fix i
 
 Grab the latest build from [Releases](../../releases).
 
-> **macOS:** the app is not code-signed (an Apple Developer account costs $99/yr).
-> On first launch macOS will say it's damaged or from an unidentified developer.
-> To allow it:
-> ```bash
-> xattr -dr com.apple.quarantine /Applications/YTDownload.app
-> ```
-> Or build it yourself — it takes two minutes.
+#### First launch on macOS
+
+YTDownload is not signed or notarised by Apple (that needs a developer account
+at $99/yr), so macOS blocks it the first time. This is a one-off:
+
+1. Open the `.dmg` and drag **YTDownload** into your Applications folder.
+2. Open it. macOS will say it cannot be verified or that it comes from an
+   unidentified developer. Click **OK** or **Done**.
+3. Go to **System Settings → Privacy & Security**, scroll to the message about
+   YTDownload and click **Open Anyway**.
+4. Open it again and confirm. From then on it launches normally.
+
+If you prefer the terminal, one line does the same thing:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/YTDownload.app
+```
+
+Or build it yourself — two minutes, and no warning at all.
 
 ### Build from source
 
