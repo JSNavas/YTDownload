@@ -9,31 +9,92 @@ use tokio::process::{Child, Command};
 
 // ---------------------------------------------------------------- herramientas
 
-/// Busca un binario en las rutas habituales de macOS/Linux y en el PATH.
+/// Localiza un binario sin depender de que la app herede el PATH del shell:
+/// una app lanzada desde el Finder, el Explorador o un lanzador de escritorio
+/// no lo hereda. Mira primero las rutas habituales de cada sistema, luego el
+/// PATH del proceso y, en Unix, pregunta al shell de login como último recurso.
 fn find_tool(name: &str) -> Option<PathBuf> {
-    let candidates = [
-        format!("/opt/homebrew/bin/{name}"),
-        format!("/usr/local/bin/{name}"),
-        format!("/usr/bin/{name}"),
-        format!("/opt/local/bin/{name}"),
-    ];
-    for c in candidates.iter() {
-        let p = PathBuf::from(c);
-        if p.is_file() {
-            return Some(p);
+    // En Windows los ejecutables llevan extensión.
+    #[cfg(windows)]
+    let names: Vec<String> = vec![format!("{name}.exe"), name.to_string()];
+    #[cfg(not(windows))]
+    let names: Vec<String> = vec![name.to_string()];
+
+    let mut dirs: Vec<PathBuf> = Vec::new();
+
+    #[cfg(target_os = "macos")]
+    {
+        // Homebrew en Apple Silicon, Homebrew en Intel, sistema, MacPorts.
+        for d in [
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/opt/local/bin",
+        ] {
+            dirs.push(PathBuf::from(d));
         }
     }
-    // Fallback: resolver via `which` heredando el PATH del shell de login.
-    let out = std::process::Command::new("/bin/sh")
-        .args(["-lc", &format!("command -v {name}")])
-        .output()
-        .ok()?;
-    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if !s.is_empty() && PathBuf::from(&s).is_file() {
-        Some(PathBuf::from(s))
-    } else {
-        None
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        for d in [
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            "/snap/bin",
+            "/var/lib/flatpak/exports/bin",
+        ] {
+            dirs.push(PathBuf::from(d));
+        }
+        // pipx y pip --user, que es como se instala yt-dlp en muchas distros.
+        if let Some(home) = dirs::home_dir() {
+            dirs.push(home.join(".local/bin"));
+        }
     }
+
+    #[cfg(windows)]
+    {
+        // winget deja enlaces aquí; chocolatey y scoop tienen su propia carpeta.
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            dirs.push(PathBuf::from(&local).join(r"Microsoft\WinGet\Links"));
+            dirs.push(PathBuf::from(&local).join(r"Programs\Python\Scripts"));
+        }
+        if let Some(home) = dirs::home_dir() {
+            dirs.push(home.join(r"scoop\shims"));
+        }
+        dirs.push(PathBuf::from(r"C:\ProgramData\chocolatey\bin"));
+    }
+
+    // El PATH del proceso, sea cual sea el sistema.
+    if let Some(path) = std::env::var_os("PATH") {
+        dirs.extend(std::env::split_paths(&path));
+    }
+
+    for d in &dirs {
+        for n in &names {
+            let p = d.join(n);
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+    }
+
+    // Último recurso en Unix: preguntar al shell de login, que sí carga el
+    // perfil del usuario con sus rutas propias. En Windows no hay equivalente
+    // y tampoco hace falta: allí el PATH del proceso ya es el bueno.
+    #[cfg(unix)]
+    {
+        let out = std::process::Command::new("/bin/sh")
+            .args(["-lc", &format!("command -v {name}")])
+            .output()
+            .ok()?;
+        let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !s.is_empty() && PathBuf::from(&s).is_file() {
+            return Some(PathBuf::from(s));
+        }
+    }
+
+    None
 }
 
 #[derive(Serialize)]
