@@ -123,19 +123,27 @@ En [Releases](../../releases).
 YTDownload no está firmado ni notarizado por Apple (hace falta una cuenta de
 desarrollador, 99 $/año), así que macOS lo bloquea al abrirlo. Es cosa de una vez:
 
-1. Abre el `.dmg` y arrastra **YTDownload** a tu carpeta Aplicaciones.
-2. Ábrelo. macOS dirá que no se puede comprobar o que viene de un
-   desarrollador no identificado. Dale a **Aceptar** o **Hecho**.
-3. Ve a **Ajustes del Sistema → Privacidad y seguridad**, baja hasta el aviso
-   sobre YTDownload y pulsa **Abrir de todos modos**.
-4. Vuelve a abrirlo y confirma. A partir de aquí se abre con doble clic
-   como cualquier otra app.
+Descarga el `.dmg` que corresponda a tu Mac: **aarch64** para los Apple
+Silicon (M1, M2, M3, M4) y **x64** para los Intel. Comprueba cuál tienes con
+`uname -m` en la Terminal: `arm64` o `x86_64`.
 
-Si prefieres la terminal, una línea hace lo mismo:
+Arrastra **YTDownload** a tu carpeta Aplicaciones y luego, **una sola vez**,
+abre la Terminal y ejecuta:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/YTDownload.app
 ```
+
+Después ya se abre con doble clic como cualquier otra app, y las
+actualizaciones se instalan solas desde dentro.
+
+> **Sí, hace falta la Terminal.** Al no estar firmada con un certificado de
+> Apple, macOS no dice "desarrollador no identificado" (que se resuelve desde
+> Ajustes con *Abrir de todos modos*), sino **"está dañado y no puede
+> abrirse"**. Ante ese mensaje concreto **el sistema no ofrece ninguna opción
+> para permitirlo**, y la única salida es quitar la marca de cuarentena con el
+> comando de arriba. La app no está dañada: el comando solo borra la etiqueta
+> que el navegador le pone a lo descargado.
 
 O compílalo tú, que tarda dos minutos y evita el aviso del todo.
 

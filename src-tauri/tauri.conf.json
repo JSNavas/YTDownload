@@ -34,5 +34,15 @@
     "category": "Utility",
     "shortDescription": "Descarga videos y playlists de YouTube en MP3 o MP4",
     "longDescription": "YTDownload descarga videos y playlists de YouTube en MP3 o MP4. Sin anuncios, sin limites, sin telemetria. Usa yt-dlp y ffmpeg."
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/JSNavas/YTDownload/releases/latest/download/latest.json"
+      ],
+      "dialog": false,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERCRTIwMTgzRUUxQTMyQjEKUldTeE1ocnVnd0hpMjFFaFZuUHE5Umt1R21DRmRrSkNBZ1psYkZkSFp4UGl6WjViZ3FUSThXY3kK"
+    }
   }
 }

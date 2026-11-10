@@ -12,5 +12,9 @@
     "@tauri-apps/cli": "^2"
   },
   "description": "YouTube downloader: playlists and videos, MP3 or MP4. No ads, no limits, no telemetry.",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.14.1"
+  }
 }

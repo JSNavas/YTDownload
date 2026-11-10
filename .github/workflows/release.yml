@@ -59,7 +59,14 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Firma cada bundle. Sin esto la app rechaza la actualización, que
+          # es justo lo que queremos: solo instala lo firmado con esta clave.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          # Publica latest.json, el archivo que la app consulta para saber
+          # si hay versión nueva y de dónde bajarla.
+          includeUpdaterJson: true
           tagName: ${{ github.ref_name }}
           releaseName: "YTDownload ${{ github.ref_name }}"
           releaseBody: |

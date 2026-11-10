@@ -1,6 +1,10 @@
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 const openDialog = window.__TAURI__.dialog?.open ?? null;
+// El updater y process llegan por withGlobalTauri; si faltan, se cae al
+// camino antiguo de abrir la página de descargas.
+const updater = window.__TAURI__.updater ?? null;
+const relaunchApp = window.__TAURI__.process?.relaunch ?? null;
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls) => { const n = document.createElement(tag); if (cls) n.className = cls; return n; };
@@ -65,6 +69,11 @@ const I18N = {
     upToDate: (v) => `Estás en la última versión (${v})`,
     updFound: (v) => `Hay una versión nueva: ${v}`,
     updFailed: "No se pudo comprobar. ¿Hay conexión?",
+    install: "Instalar ahora",
+    downloading: (p) => `Descargando… ${p}%`,
+    installing: "Instalando…",
+    willRestart: "La app se reiniciará sola al terminar.",
+    instFailed: "No se pudo instalar. Prueba a descargarla a mano.",
     updating: "Actualizando…",
   },
   en: {
@@ -124,6 +133,11 @@ const I18N = {
     upToDate: (v) => `You are on the latest version (${v})`,
     updFound: (v) => `A new version is available: ${v}`,
     updFailed: "Could not check. Is there a connection?",
+    install: "Install now",
+    downloading: (p) => `Downloading… ${p}%`,
+    installing: "Installing…",
+    willRestart: "The app will restart itself when it finishes.",
+    instFailed: "Could not install. Try downloading it by hand.",
     updating: "Updating…",
   },
 };
@@ -820,29 +834,77 @@ async function showVersion() {
   catch (_) { $("app-ver").textContent = ""; }
 }
 
+/** Descarga la actualización firmada y la instala, con el progreso a la
+ *  vista. Al acabar reinicia la app sola. */
+async function installUpdate(update, msg, btn) {
+  btn.disabled = true;
+  let total = 0, got = 0;
+  try {
+    await update.downloadAndInstall((ev) => {
+      if (ev.event === "Started") {
+        total = ev.data.contentLength || 0;
+        msg.textContent = t("downloading", 0);
+      } else if (ev.event === "Progress") {
+        got += ev.data.chunkLength || 0;
+        const pct = total ? Math.min(100, Math.round((got / total) * 100)) : 0;
+        msg.textContent = t("downloading", pct);
+      } else if (ev.event === "Finished") {
+        msg.textContent = t("installing");
+      }
+    });
+    msg.textContent = t("willRestart");
+    if (relaunchApp) await relaunchApp();
+  } catch (e) {
+    btn.disabled = false;
+    msg.textContent = t("instFailed");
+    toast("err", t("instFailed"), String(e));
+  }
+}
+
 async function doCheckUpdates() {
   const b = $("check-updates");
   const msg = $("upd-msg");
   b.disabled = true;
   msg.className = "hint";
   msg.textContent = t("checking");
+
+  // Camino bueno: el updater firmado, que instala sin salir de la app.
+  if (updater?.check) {
+    try {
+      const update = await updater.check();
+      b.disabled = false;
+      if (!update) {
+        const v = await invoke("app_version").catch(() => "");
+        msg.textContent = t("upToDate", v);
+        return;
+      }
+      msg.textContent = t("updFound", update.version) + " ";
+      const go = el("button", "btn sm primary");
+      go.textContent = t("install");
+      go.onclick = () => installUpdate(update, msg, go);
+      msg.append(go);
+      return;
+    } catch (_) {
+      // Si el updater no está disponible todavía (por ejemplo, una versión
+      // publicada antes de que existiera latest.json), seguimos abajo.
+    }
+  }
+
+  // Camino de reserva: avisar y abrir la página de descargas.
   let info = null, failed = false;
   try { info = await invoke("check_app_update"); } catch (_) { failed = true; }
   b.disabled = false;
-
-  if (failed) { msg.className = "hint"; msg.textContent = t("updFailed"); return; }
+  if (failed) { msg.textContent = t("updFailed"); return; }
   if (!info) {
     const v = await invoke("app_version").catch(() => "");
     msg.textContent = t("upToDate", v);
     return;
   }
-  msg.textContent = "";
-  const span = el("span");
-  span.textContent = t("updFound", info.version) + " ";
+  msg.textContent = t("updFound", info.version) + " ";
   const link = el("button", "btn sm primary");
   link.textContent = t("appUpdGet");
   link.onclick = () => invoke("open_url", { url: info.url }).catch(() => {});
-  msg.append(span, link);
+  msg.append(link);
 }
 
 function openSettings() {

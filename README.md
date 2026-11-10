@@ -121,18 +121,25 @@ Grab the latest build from [Releases](../../releases).
 YTDownload is not signed or notarised by Apple (that needs a developer account
 at $99/yr), so macOS blocks it the first time. This is a one-off:
 
-1. Open the `.dmg` and drag **YTDownload** into your Applications folder.
-2. Open it. macOS will say it cannot be verified or that it comes from an
-   unidentified developer. Click **OK** or **Done**.
-3. Go to **System Settings → Privacy & Security**, scroll to the message about
-   YTDownload and click **Open Anyway**.
-4. Open it again and confirm. From then on it launches normally.
+Download the `.dmg` that matches your Mac: **aarch64** for Apple Silicon
+(M1, M2, M3, M4) and **x64** for Intel. Run `uname -m` if you are unsure —
+`arm64` or `x86_64`.
 
-If you prefer the terminal, one line does the same thing:
+Drag **YTDownload** into Applications, then open Terminal **once** and run:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/YTDownload.app
 ```
+
+After that it opens on a double-click like anything else, and updates
+install themselves from inside the app.
+
+> **Yes, the Terminal is required.** Without an Apple certificate, macOS does
+> not say "unidentified developer" (which Settings can override with *Open
+> Anyway*) — it says **"is damaged and can't be opened"**. For that specific
+> message macOS offers **no way to allow it**, so clearing the quarantine flag
+> is the only route. Nothing is damaged: the command just removes the label
+> the browser attaches to downloaded files.
 
 Or build it yourself — two minutes, and no warning at all.
 
