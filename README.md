@@ -131,8 +131,7 @@ Drag **YTDownload** into Applications, then open Terminal **once** and run:
 xattr -dr com.apple.quarantine /Applications/YTDownload.app
 ```
 
-After that it opens on a double-click like anything else, and updates
-install themselves from inside the app.
+After that it opens on a double-click like anything else.
 
 > **Yes, the Terminal is required.** Without an Apple certificate, macOS does
 > not say "unidentified developer" (which Settings can override with *Open

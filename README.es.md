@@ -134,8 +134,7 @@ abre la Terminal y ejecuta:
 xattr -dr com.apple.quarantine /Applications/YTDownload.app
 ```
 
-Después ya se abre con doble clic como cualquier otra app, y las
-actualizaciones se instalan solas desde dentro.
+Después ya se abre con doble clic como cualquier otra app.
 
 > **Sí, hace falta la Terminal.** Al no estar firmada con un certificado de
 > Apple, macOS no dice "desarrollador no identificado" (que se resuelve desde

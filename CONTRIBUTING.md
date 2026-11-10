@@ -69,6 +69,38 @@ playlist. Most bugs here only show up against real YouTube responses.
 - **Pause and resume** a download, rather than only cancel and retry.
 - **Bandwidth limit** (`--limit-rate`), exposed in Settings.
 
+## Releases and the updater
+
+Tagging publishes a release:
+
+```bash
+git tag v0.1.7 && git push --tags
+```
+
+The workflow builds all four platforms and publishes the release **only if
+every one of them succeeds**. A partial build stays a draft rather than
+reaching users with installers missing.
+
+The app also ships the Tauri updater plugin, which is **dormant by default**.
+Without a signing key the update button falls back to opening the releases
+page, which is the current behaviour. To turn the real thing on, the
+repository owner generates a keypair and stores the private half as a secret:
+
+```bash
+npx tauri signer generate -w ~/.ytdownload-keys/updater.key
+gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.ytdownload-keys/updater.key
+gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --body ""
+```
+
+The public half already lives in `tauri.conf.json`. From then on each release
+is signed and carries a `latest.json`; the app downloads the bundle for the
+platform it is running on, checks it against that public key, installs it and
+relaunches. Only builds signed with the matching private key are accepted.
+
+**If the private key is lost, updates stop working** and everyone has to
+reinstall by hand, so keep a backup outside the repository. It must never be
+committed.
+
 ## Commit messages
 
 Plain and descriptive. `fix: playlist subfolder was created even when unchecked`
